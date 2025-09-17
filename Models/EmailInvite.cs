@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Demo.Models;
 
-public class EmailInvite
+public partial class EmailInvite
 {
     public Guid EmailInviteId { get; set; }
 

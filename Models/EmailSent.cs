@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Demo.Models;
 
-public class EmailSent
+public partial class EmailSent
 {
     public Guid EmailSentId { get; set; }
 

@@ -15,12 +15,25 @@ builder.Services.AddDbContext<MyDBContext>(options =>
         .EnableSensitiveDataLogging(),
     ServiceLifetime.Transient
 );
+builder.Services.Configure<SmtpSettings>(
+    builder.Configuration.GetSection("Smtp"));
 builder.Services.AddHangfire(x =>
     x.UseSqlServerStorage(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddHangfireServer();
-builder.Services.Configure<SmtpSettings>(
-    builder.Configuration.GetSection("Smtp"));
+
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = "MyCookieAuth";
+    options.DefaultSignInScheme = "MyCookieAuth";
+    options.DefaultAuthenticateScheme = "MyCookieAuth";
+})
+.AddCookie("MyCookieAuth", options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/Login";
+});
+
 
 var app = builder.Build();
 
@@ -37,10 +50,10 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication(); // must come before UseAuthorization
 app.UseAuthorization();
-
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Marketing}/{action=Subscribe}");
+    pattern: "{controller=Account}/{action=Login}");
 
 app.Run();

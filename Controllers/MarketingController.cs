@@ -5,6 +5,7 @@ using Demo.Context;
 using Demo.Models;
 using Demo.Services;
 using Hangfire;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -14,16 +15,15 @@ namespace Demo.Controllers
     public class MarketingController : Controller
     {
         private readonly MyDBContext _context;
-        private readonly SmtpSettings _smtpSettings;
         private readonly EmailService _emailService;
 
-        public MarketingController(MyDBContext context, IOptions<SmtpSettings> smtpSettings, EmailService emailService)
+        public MarketingController(MyDBContext context, EmailService emailService)
         {
             _context = context;
-            _smtpSettings = smtpSettings.Value;
             _emailService = emailService;
 
         }
+        [Authorize(Roles = "Manager")]
         public IActionResult Subscribe()
         {
             return View();
@@ -56,6 +56,7 @@ namespace Demo.Controllers
         }
 
         // GET: Email/Send
+        [Authorize(Roles = "Manager")]
         public ActionResult Send()
         {
             return View();
@@ -79,7 +80,30 @@ namespace Demo.Controllers
             return View();
         }
 
+        // Runs asynchronously in background
+        private async Task SendEmailsInBackground(string subject, string message)
+        {
+            try
+            {
+                using (var scope = HttpContext.RequestServices.CreateScope())
+                {
+                    var dbContext = scope.ServiceProvider.GetRequiredService<MyDBContext>();
+                    var emailService = scope.ServiceProvider.GetRequiredService<EmailService>();
+
+                    await emailService.SendEmailAsync(subject, message);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log exception here
+                Console.WriteLine(ex);
+            }
+        }
+
         // Show sent emails
+
+        [Authorize(Roles = "Manager,Front Staff")]
+
         public ActionResult SentEmails()
         {
             var emails = _context.EmailSents.OrderByDescending(e => e.SentAt).ToList();

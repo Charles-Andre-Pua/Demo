@@ -1,0 +1,115 @@
+﻿@model IEnumerable<Employee>
+
+@{
+    ViewBag.Title = "Employee Accounts";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Employee Accounts</h2>
+        <a asp-action="Create" class="btn btn-primary">Create Account</a>
+    </div>
+
+    <table class="table table-hover table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Username</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var emp in Model)
+        {
+            var account = emp.Accounts;
+            <tr>
+                <td>@emp.EmployeeName</td>
+                <td>@account?.Role?.RoleName</td>
+                <td>@account?.Username</td>
+                <td>
+                    @if (emp.Status)
+                    {
+                        <span class="badge bg-success">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Inactive</span>
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-warning" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editModal-@emp.EmployeeId">
+                        Edit
+                    </button>
+                    <button class="btn btn-sm btn-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal-@emp.EmployeeId">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+
+            <!-- Edit Modal -->
+            <div class="modal fade" id="editModal-@emp.EmployeeId" tabindex="-1">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form asp-action="Edit" method="post">
+                      <div class="modal-header">
+                          <h5 class="modal-title">Edit Employee</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                          <input type="hidden" name="EmployeeId" value="@emp.EmployeeId" />
+
+                          <div class="mb-3">
+                              <label class="form-label">Employee Name</label>
+                              <input type="text" name="EmployeeName" class="form-control" value="@emp.EmployeeName" required />
+                          </div>
+                          <div class="mb-3">
+                              <label class="form-label">Role</label>
+                              <select name="RoleId" class="form-select">
+                                  @foreach (var role in ViewBag.Roles)
+                                  {
+                                      <option value="@role.RoleId" selected="@(role.RoleId == account?.RoleId)">
+                                          @role.RoleName
+                                      </option>
+                                  }
+                              </select>
+                          </div>
+                      </div>
+                      <div class="modal-footer">
+                          <button type="submit" class="btn btn-primary">Save Changes</button>
+                      </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <!-- Delete Modal -->
+            <div class="modal fade" id="deleteModal-@emp.EmployeeId" tabindex="-1">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form asp-action="Delete" method="post">
+                      <input type="hidden" name="EmployeeId" value="@emp.EmployeeId" />
+                      <div class="modal-header">
+                          <h5 class="modal-title">Confirm Delete</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                          Are you sure you want to deactivate <b>@emp.EmployeeName</b>?
+                      </div>
+                      <div class="modal-footer">
+                          <button type="submit" class="btn btn-danger">Yes, Deactivate</button>
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+        }
+        </tbody>
+    </table>
+</div>
