@@ -1,0 +1,49 @@
+﻿@model IEnumerable<EmailSent>
+
+@{
+    ViewBag.Title = "Sent Emails";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">📧 Sent Emails</h2>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Subject</th>
+                    <th>Message Preview</th>
+                    <th>Sent At</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var email in Model)
+                {
+                    var preview = email.Message.Length > 80
+                    ? email.Message.Substring(0, 80) + "..."
+                    : email.Message;
+                    <tr data-bs-toggle="collapse" data-bs-target="#email-@email.EmailSentId" class="clickable-row">
+                        <td>@email.Subject</td>
+                        <td>@preview</td>
+                        <td>@email.SentAt.ToString("g")</td>
+                    </tr>
+                    <tr id="email-@email.EmailSentId" class="collapse bg-light">
+                        <td colspan="3">
+                            <strong>Full Message:</strong>
+                            <p class="mt-2 mb-0">@email.Message</p>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Optional: Add pointer style on hover
+        document.querySelectorAll(".clickable-row").forEach(row => {
+            row.style.cursor = "pointer";
+        });
+    </script>
+}

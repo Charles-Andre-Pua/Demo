@@ -1,5 +1,7 @@
 using Demo.Configurations;
 using Demo.Context;
+using Demo.Services;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,8 +15,12 @@ builder.Services.AddDbContext<MyDBContext>(options =>
         .EnableSensitiveDataLogging(),
     ServiceLifetime.Transient
 );
+builder.Services.AddHangfire(x =>
+    x.UseSqlServerStorage(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddHangfireServer();
 builder.Services.Configure<SmtpSettings>(
     builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<EmailService>();
 
 var app = builder.Build();
 

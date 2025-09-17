@@ -1,11 +1,13 @@
-﻿using Demo.Configurations;
+﻿using System.Net;
+using System.Net.Mail;
+using Demo.Configurations;
 using Demo.Context;
 using Demo.Models;
+using Demo.Services;
+using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Net;
-using System.Net.Mail;
 
 namespace Demo.Controllers
 {
@@ -13,11 +15,13 @@ namespace Demo.Controllers
     {
         private readonly MyDBContext _context;
         private readonly SmtpSettings _smtpSettings;
+        private readonly EmailService _emailService;
 
-        public MarketingController(MyDBContext context, IOptions<SmtpSettings> smtpSettings)
+        public MarketingController(MyDBContext context, IOptions<SmtpSettings> smtpSettings, EmailService emailService)
         {
             _context = context;
             _smtpSettings = smtpSettings.Value;
+            _emailService = emailService;
 
         }
         public IActionResult Subscribe()
@@ -51,55 +55,35 @@ namespace Demo.Controllers
             return View(model);
         }
 
-        public IActionResult SendEmail()
+        // GET: Email/Send
+        public ActionResult Send()
         {
             return View();
-        }// POST: Marketing/SendEmail
+        }
+
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SendEmail(EmailSent model)
+        public ActionResult Send(string subject, string message)
         {
-            if (!ModelState.IsValid)
-                return View(model);
 
-            var recipients = await _context.EmailInvites
-                .Select(e => e.EmailAddress)
-                .ToListAsync();
-
-            if (!recipients.Any())
+            if (!_context.EmailInvites.Any())
             {
-                ViewBag.Message = "No subscribers found.";
-                return View(model);
+                ViewBag.Message = "No subscribers found!";
+                return View();
             }
 
-            try
-            {
-                using (var smtp = new SmtpClient(_smtpSettings.Host, _smtpSettings.Port))
-                {
-                    smtp.Credentials = new NetworkCredential(_smtpSettings.Username, _smtpSettings.Password);
-                    smtp.EnableSsl = true;
+            BackgroundJob.Enqueue(() =>
+                     _emailService.SendEmailAsync(subject, message)
+                 );
 
-                    foreach (var email in recipients)
-                    {
-                        var mail = new MailMessage();
-                        mail.From = new MailAddress(_smtpSettings.Username, "TheSocialNi&&ers");
-                        mail.To.Add(email);
-                        mail.Subject = model.Subject;
-                        mail.Body = model.Message;
-                        mail.IsBodyHtml = false;
+            ViewBag.Message = "Emails are being sent in the background!";
+            return View();
+        }
 
-                        await smtp.SendMailAsync(mail);
-                    }
-                }
-
-                ViewBag.Message = "Emails sent successfully!";
-            }
-            catch (Exception ex)
-            {
-                ViewBag.Message = $"Error: {ex.Message}";
-            }
-
-            return View(model);
+        // Show sent emails
+        public ActionResult SentEmails()
+        {
+            var emails = _context.EmailSents.OrderByDescending(e => e.SentAt).ToList();
+            return View(emails);
         }
     }
 }
