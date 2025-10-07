@@ -3,11 +3,11 @@ using System.Net.Mail;
 using Demo.Configurations;
 using Demo.Context;
 using Demo.Models;
-using Demo.Services;
-using Hangfire;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace Demo.Controllers
 {
@@ -15,46 +15,12 @@ namespace Demo.Controllers
     {
         private readonly MyDBContext _context;
         private readonly SmtpSettings _smtpSettings;
-        private readonly EmailService _emailService;
 
-        public MarketingController(MyDBContext context, IOptions<SmtpSettings> smtpSettings, EmailService emailService)
+        public MarketingController(MyDBContext context, IOptions<SmtpSettings> smtpSettings)
         {
             _context = context;
             _smtpSettings = smtpSettings.Value;
-            _emailService = emailService;
-
         }
-        public IActionResult Subscribe()
-        {
-            return View();
-        }
-        // POST: /MarketingInvite/Subscribe
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Subscribe(EmailInvite model)
-        {
-            if (ModelState.IsValid)
-            {
-                // Avoid duplicates
-                var exists = _context.EmailInvites
-                    .Any(x => x.EmailAddress == model.EmailAddress);
-
-                if (!exists)
-                {
-                    _context.EmailInvites.Add(model);
-                    _context.SaveChanges();
-
-                    ViewBag.Message = "Thanks! You’ll receive our invites and offers.";
-                }
-                else
-                {
-                    ViewBag.Message = "This email is already subscribed.";
-                }
-            }
-
-            return View(model);
-        }
-
         // GET: Email/Send
         public ActionResult Send()
         {
@@ -62,19 +28,55 @@ namespace Demo.Controllers
         }
 
         [HttpPost]
-        public ActionResult Send(string subject, string message)
+        public async Task<ActionResult> Send(string subject, string message)
         {
+            var recipients = await _context.EmailInvites
+               .Select(e => e.EmailAddress)
+               .ToListAsync();
 
-            if (!_context.EmailInvites.Any())
+            if (!recipients.Any())
             {
                 ViewBag.Message = "No subscribers found!";
                 return View();
             }
 
-            BackgroundJob.Enqueue(() =>
-                     _emailService.SendEmailAsync(subject, message)
-                 );
+            _ = Task.Run(async () =>
+            {
+                using var scope = HttpContext.RequestServices.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<MyDBContext>();
+                var smtpSettings = scope.ServiceProvider.GetRequiredService<IOptions<SmtpSettings>>().Value;
 
+                
+                using (var smtp = new SmtpClient(smtpSettings.Host, smtpSettings.Port))
+                {
+                    smtp.UseDefaultCredentials = false;
+                    smtp.Credentials = new NetworkCredential(smtpSettings.Username, smtpSettings.Password);
+                    smtp.EnableSsl = true;
+
+                    foreach (var email in recipients)
+                    {
+                        var mail = new MailMessage
+                        {
+                            From = new MailAddress(smtpSettings.Username, "TheSocialName"),
+                            Subject = subject,
+                            Body = message,
+                            IsBodyHtml = false
+                        };
+                        mail.To.Add(email);
+                        await smtp.SendMailAsync(mail);
+                    }
+
+                    // Save sent email to DB
+                    var sentEmail = new EmailSent
+                    {
+                        Subject = subject,
+                        Message = message,
+                        SentAt = DateTime.Now
+                    };
+                    context.EmailSents.Add(sentEmail);
+                    await context.SaveChangesAsync();
+                }
+            });
             ViewBag.Message = "Emails are being sent in the background!";
             return View();
         }
